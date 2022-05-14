@@ -1,78 +1,208 @@
-from ast import Not
 from pathlib import Path
-from re import I
-from typing import List
-import random
+from typing import List, Callable
 
-from settings import MODS_PATH, RESOURCE_FOLDER_NAMES
-
-PADDING_SCALE = 2
+from settings import MODS_PATH, RESOURCE_DIR_NAMES
 
 
 def is_valid_dir(dir: Path) -> bool:
     return dir.exists() and dir.is_dir()
 
 
-class ModFile:
-    def __init__(self, path):
+class ModResource:
+    """Generic class to hold any mod resource (file or directory)"""
+
+    def __init__(self, path: Path, parent):
         self.path = path
         self.name = path.stem
+        self.parent = parent
 
     def __str__(self):
         return self.name
 
+    def __repr__(self):
+        return f"ModResource[{self.parent}: {self}]"
 
-class ModDir:
-    def __init__(self, path: Path, parent=None):
-        self.path = path
-        self.name = path.stem
-        # self.to_activate = False
 
-        # TODO - this is for testing the display of activated folders
-        self.to_activate = bool(random.getrandbits(1))
-        self.parent = parent
+class ModFile(ModResource):
+    def __repr__(self):
+        return f"ModFile[{self.parent}: {self}]"
 
-        self.data_folders = None
 
-    def get_data_folders(self):
-        if self.data_folders is None:
-            data_folders = self.find_data_folders()
-            if isinstance(data_folders, ModDir):
-                self.data_folders = [data_folders]
-            else:
-                self.data_folders = data_folders
+class ESPFile(ModFile):
+    def __repr__(self):
+        return f"ESPFile[{self.parent}: {self}]"
 
-        return self.data_folders
 
-    def __str__(self):
-        return str(self.name)
+class BSAFile(ModFile):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_active = None
 
     def __repr__(self):
-        return f"ModDir[{self.path}]"
+        return f"BSAFile[{self.parent}: {self}]"
 
-    @property
-    def resource_dirs(self) -> List:
+    def set_active(self, is_active: bool = True):
+        self.is_active = is_active
 
-        resource_dir_options = [
-            self.path / resource for resource in RESOURCE_FOLDER_NAMES
+
+class ModDir(ModResource):
+    """A folder that is part of a mod structure"""
+
+    def __init__(
+        self,
+        *args,
+        child_factory: Callable = None,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.child_factory = child_factory
+        self.children = self.get_children()
+
+    def __repr__(self):
+        return f"ModDir[{self.parent}: {self}]"
+
+    def init_child(self, child_path: Path) -> ModResource:
+        return self.child_factory(path=child_path, parent=self)
+
+    def get_children(self) -> List[ModResource]:
+        children = [self.init_child(child) for child in self.path.iterdir()]
+
+        # wont list unclassified children
+        return [child for child in children if child is not None]
+
+    def get_children_of_type(self, object) -> List[ModResource]:
+        return [child for child in self.children if type(child) is object]
+
+    def has_child_of_type(self, object) -> bool:
+        return len(self.get_children_of_type(object)) > 0
+
+    def get_children_of_instance(self, object) -> List[ModResource]:
+        return [child for child in self.children if isinstance(child, object)]
+
+    def has_child_of_instance(self, object) -> bool:
+        return len(self.get_children_of_instance(object)) > 0
+
+    def search_children(
+        self, condition: Callable, only_of_instance: object = None
+    ) -> List[ModResource]:
+
+        if only_of_instance is not None:
+            valid_children = self.get_children_of_instance(only_of_instance)
+
+        else:
+            valid_children = self.children
+
+        if len(valid_children) == 0:
+            # no more children, so no possible serach results, terminate result
+            return None
+
+        return [child for child in valid_children if condition(valid_children)]
+
+    def recurse_search_children(
+        self, condition: Callable, only_of_instance=None
+    ) -> List[ModResource]:
+        """Recursively search though children (and children of children etc...)
+        for children that meet the input 'condition'.
+
+        Optional: Limit search to only those of a instance using only_of_instnace"""
+
+        if only_of_instance is not None:
+            children = self.get_children_of_instance(only_of_instance)
+
+        else:
+            children = self.children
+
+        if len(children) == 0:
+            # no more children, so no possible search results, terminate result
+            return None
+
+        # check if any direct children meets condition
+        search_results = [child for child in children if condition(child)]
+
+        if len(search_results) > 0:
+            # if we've found results - terminate search here and return results
+            return search_results
+
+        # otherwise, if we havent found results - perform search in all child directories
+        child_dirs = self.get_children_of_instance(ModDir)
+
+        if len(child_dirs) == 0:
+            return None
+
+        # iterate through child directories, performing same search
+        recurse_results = [
+            child_dir.recurse_search_children(condition, only_of_instance)
+            for child_dir in child_dirs
         ]
 
-        return [
-            ModDir(resource_dir)
-            for resource_dir in resource_dir_options
-            if is_valid_dir(resource_dir)
+        recurse_results = [
+            child_dir for child_dir in recurse_results if child_dir is not None
         ]
 
-    @property
-    def has_resources(self) -> bool:
-        return len(self.resource_dirs) > 0
+        # unpacking result list
+        return [result for results in recurse_results for result in results]
 
-    def filetypes_in_dir(self, filetype: str) -> List[Path]:
-        return list(self.path.glob(f'*.{filetype.lstrip(".")}'))
+
+class ModResourceDir(ModDir):
+    def __init__(self, mod_dir: ModDir):
+        self.path = mod_dir.path
+        self.name = mod_dir.name
+        self.parent = mod_dir.parent
+        self.child_factory = mod_dir.child_factory
+        self.children = mod_dir.children
+
+    def __repr__(self):
+        return f"ModResourceDir[{self.parent}: {self}]"
+
+    @staticmethod
+    def is_mod_resource_dir(mod_dir: ModDir) -> bool:
+        return mod_dir.name.lower() in RESOURCE_DIR_NAMES
+
+
+class ModDataDir(ModDir):
+    """A 'Data Directory' - will have core mod files (ESP/BSA)
+    or 'resource folders' at top-level.
+
+    Some mods will have multiple Data Directories in a given mod, this
+    is usually to :
+      - provide customisation (i.e. installing different sets of
+        spell effects)
+      - or add compatibility layers (i.e. install this data dir if
+        you also X mod)
+    """
+
+    def __init__(self, mod_dir: ModDir):
+        self.path = mod_dir.path
+        self.name = mod_dir.name
+        self.parent = mod_dir.parent
+        self.child_factory = mod_dir.child_factory
+        self.children = mod_dir.children
+
+        self.to_activate = False
+
+        # internal vars - used to cache property results
+        self._esp_files = None
+        self._bsa_files = None
+        self._resource_dirs = None
+
+    def __repr__(self):
+        return f"ModDataDir[{self.parent}: {self}]"
+
+    @staticmethod
+    def is_mod_data_dir(mod_dir: ModDir) -> bool:
+        return (
+            mod_dir.has_child_of_instance(BSAFile)
+            or mod_dir.has_child_of_instance(ESPFile)
+            or mod_dir.has_child_of_instance(ModResourceDir)
+        )
 
     @property
     def esp_files(self):
-        return self.filetypes_in_dir("esp")
+        if self._esp_files is None:
+            self._esp_files = self.get_children_of_type(ESPFile)
+
+        return self._esp_files
 
     @property
     def has_esp(self):
@@ -80,150 +210,111 @@ class ModDir:
 
     @property
     def bsa_files(self):
-        return self.filetypes_in_dir("bsa")
+        if self._bsa_files is None:
+            self._bsa_files = self.get_children_of_type(BSAFile)
+
+        return self._bsa_files
 
     @property
     def has_bsa(self):
         return len(self.bsa_files) > 0
 
     @property
-    def is_data_folder(self) -> bool:
-        """Returns true if dir is a top-level directory
-        for a mod (i.e. contains .esp, .bsa, or resource
-        sub-directories"""
-
-        return self.has_esp or self.has_bsa or self.has_resources
-
-    def find_data_folders(self) -> List:
-        if self.is_data_folder:
-            return self
-
-        sub_dirs = [
-            ModDir(sub_dir, parent=self)
-            for sub_dir in self.path.glob("*")
-            if sub_dir.is_dir()
-        ]
-
-        data_folders_list = list(
-            filter(
-                lambda x: x is not None,
-                [sub_dir.find_data_folders() for sub_dir in sub_dirs],
+    def resource_dirs(self) -> List:
+        if self._resource_dirs is None:
+            self._resource_dirs = self.search_children(
+                condition=lambda x: x.name in RESOURCE_DIR_NAMES,
+                only_of_instance=ModDir,
             )
-        )
+        return self._resource_dirs
 
-        if len(data_folders_list) == 0:
-            return None
+    def has_resource_dirs(self) -> bool:
+        return len(self.resource_dirs) > 0
 
-        return data_folders_list
 
-    def print_mod_contents(self) -> None:
-        if self.has_esp:
-            print_indent_title("ESPs", indent_level=1)
-            for esp in self.esp_files:
-                print_indent_item(esp, indent_level=2)
+def mod_resource_factory(path: Path = None, **kwargs) -> ModResource:
+    """Takes an input path, and returns  an instantiation of ModResource
+    subclass depending on the path characteristics."""
+    if path is None:
+        raise TypeError("mod_resource_factory requires a path")
 
-        if self.has_bsa:
-            print_indent_title("BSAs", indent_level=1)
-            for bsa in self.bsa_files:
-                print_indent_item(bsa, indent_level=2)
+    if path.is_file():
+        file_type = path.suffix.lower()
 
-        if self.has_resources:
-            print_indent_title("Resources", indent_level=1)
-            for resource in self.resource_dirs:
-                print_indent_item(resource, indent_level=2)
+        if file_type == ".bsa":
+            return BSAFile(path, **kwargs)
 
-    def ask_to_activate(self):
-        """Presents the directory mod contents, and asks the user if the
-        dir should be activated"""
+        elif file_type == ".esp":
+            return ESPFile(path, **kwargs)
 
-        print(f" Contents:")
-        self.print_mod_contents()
-
-        choice = None
-        while choice is None:
-            answer = input(f"Activate {self}? (y/n):").lower().strip()
-            if answer == "n":
-                choice = False
-            elif answer == "y":
-                choice = True
-            else:
-                print("invalid answer")
-
-        self.to_activate = choice
-
-    def ask_to_activate_children(self):
-        for data_folder in self.get_data_folders():
-            print(data_folder)
-            data_folder.ask_to_activate()
-
-    def ask_to_activate_self_or_children(self):
-        if self.is_data_folder:
-            self.ask_to_activate()
         else:
-            print(f"Contains {len(self.get_data_folders())} datafolders: ", end="")
-            print("| ".join([df.__str__() for df in self.get_data_folders()]))
+            return ModFile(path, **kwargs)
 
-            self.ask_to_activate_children()
+    elif path.is_dir():
+        mod_dir = ModDir(path, child_factory=mod_resource_factory, **kwargs)
 
-    def get_folder_to_activate(self) -> List:
-        if self.is_data_folder:
-            if self.to_activate:
-                return [self]
-            else:
-                return []
+        # check if dir should be promoted? the constructors feel a little gross
+
+        if ModDataDir.is_mod_data_dir(mod_dir):
+            return ModDataDir(mod_dir)
+        elif ModResourceDir.is_mod_resource_dir(mod_dir):
+            return ModResourceDir(mod_dir)
         else:
-            return [
-                data_folder
-                for data_folder in self.get_data_folders()
-                if data_folder.is_data_folder and data_folder.to_activate
-            ]
-
-
-def print_indent_title(item, indent_level: int = 0):
-    spacing = " " * (indent_level * PADDING_SCALE)
-    print(f"{spacing} ┖ {item}")
-
-
-def print_indent_item(item, indent_level: int = 0):
-    spacing = " " * (indent_level * PADDING_SCALE)
-    print(f"{spacing} - {item}")
+            return mod_dir
 
 
 class ParentModDir(ModDir):
-    def print_data_folders(self):
-        for data_folder in self.get_data_folders():
-            print(f" {data_folder}")
+    """A directory found in the MODS_DIR set in the config file"""
 
-            data_folder.print_mod_contents()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
+        self.data_dirs = self.get_data_dirs()
 
-def get_folders_to_activate(parent_mod_dirs: List[ModDir]):
-    for parent_mod_dir in parent_mod_dirs:
-        print("-" * 80)
-        print(parent_mod_dir)
-        # parent_mod_dir.print_data_folders()
-        parent_mod_dir.ask_to_activate_self_or_children()
+    def __repr__(self):
+        return f"ParentModDir[{self}]"
 
-
-def print_folders_to_activate(parent_mod_dirs: List[ModDir]):
-    print("printing folders to activate:")
-    for parent_mod_dir in parent_mod_dirs:
-        last_parent_name = None
-        if parent_mod_dir.to_activate and parent_mod_dir.is_data_folder:
-            print_indent_title(parent_mod_dir)
+    def get_data_dirs(self) -> List[ModDataDir]:
+        if ModDataDir.is_mod_data_dir(self):
+            return [self]
 
         else:
-            for to_activate in parent_mod_dir.get_folder_to_activate():
-                if to_activate.parent:
-                    if to_activate.parent.name != last_parent_name:
-                        print_indent_title(to_activate.parent)
-                        last_parent_name = to_activate.parent.name
-                    print_indent_item(to_activate, indent_level=1)
-                else:
-                    print_indent_item(to_activate, indent_level=0)
+            return self.recurse_search_children(
+                condition=ModDataDir.is_mod_data_dir, only_of_instance=ModDir
+            )
+
+
+class ModCollectionDir(ModDir):
+    """Top-level directory where mods directories are saved/unzipped into."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.name = path.stem
+
+        self.children = self.get_parent_mod_dirs()
+
+    def __repr__(self):
+        return f"ModCollectionDir[{self}]"
+
+    def get_parent_mod_dirs(self) -> List[ParentModDir]:
+        return [
+            ParentModDir(path=dir, parent=self.name, child_factory=mod_resource_factory)
+            for dir in self.path.iterdir()
+            if dir.is_dir()
+        ]
 
 
 if __name__ == "__main__":
-    parent_mod_dirs = [ParentModDir(d) for d in MODS_PATH.iterdir() if d.is_dir()]
+    from settings import MODS_PATH
 
-    get_folders_to_activate(parent_mod_dirs)
+    print(f"scanning path {MODS_PATH} for Morrowind Mod Resources")
+    mod_dir = ModCollectionDir(MODS_PATH)
+
+    print(
+        f"finished scanning directory - printing parent mod dirs and their child data folders"
+    )
+    for parent_mod_dir in mod_dir.children:
+        print(parent_mod_dir)
+        for data_dir in parent_mod_dir.data_dirs:
+            print(f"\t{data_dir}")
+        print()

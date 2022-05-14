@@ -292,7 +292,7 @@ class ParentModDir(ModDataDir):
             )
 
 
-class ModCollectionDir(ModDir):
+class Mod(ModDir):
     """Top-level directory where mods directories are saved/unzipped into."""
 
     def __init__(self, path: Path):
@@ -316,7 +316,7 @@ if __name__ == "__main__":
     from settings import MODS_PATH
 
     print(f"scanning path {MODS_PATH} for Morrowind Mod Resources")
-    mod_dir = ModCollectionDir(MODS_PATH)
+    mod_dir = Mod(MODS_PATH)
 
     print(
         f"finished scanning directory - printing parent mod dirs and their child data folders"

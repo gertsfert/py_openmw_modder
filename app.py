@@ -1,10 +1,10 @@
-from mod_resources import ModCollectionDir
+from mod_resources import Mod
 from ui.cli_ui import CLI
 
 import settings
 
 if __name__ == "__main__":
-    mod_collection = ModCollectionDir(settings.MODS_PATH)
+    mod_collection = Mod(settings.MODS_PATH)
 
     ui = CLI()
 

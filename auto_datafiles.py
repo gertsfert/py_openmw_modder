@@ -4,8 +4,7 @@ from typing import Tuple
 from enum import Enum
 import click
 
-MODS_PATH = Path("G:\Games\OpenMWMods")
-OPEN_MW_CONF = Path("G:\My Documents\My Games\OpenMW\openmw.cfg")
+from settings import OPEN_MW_CONF
 
 
 class ColourComponentType(Enum):

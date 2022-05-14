@@ -4,22 +4,9 @@ from re import I
 from typing import List
 import random
 
-# TODO: CONFIG FILE YO
-MODS_PATH = Path("G:\Games\OpenMWMods")
+from settings import MODS_PATH, RESOURCE_FOLDER_NAMES
 
 PADDING_SCALE = 2
-RESOURCE_FOLDER_NAMES = [
-    "BookArt",
-    "Fonts",
-    "Icons",
-    "Meshes",
-    "Music",
-    "Sound",
-    "Splash",
-    "Textures",
-    "Video",
-    "Font",  # TODO: Lookup how fonts are added - not a defualt folder
-]
 
 
 def is_valid_dir(dir: Path) -> bool:

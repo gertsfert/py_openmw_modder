@@ -1,7 +1,11 @@
 from pathlib import Path
-from typing import List, Callable
+from typing import List, Callable, Dict, Tuple
 
 from settings import MODS_PATH, RESOURCE_DIR_NAMES
+from string import ascii_letters, digits
+from dataclasses import dataclass
+from datetime import datetime
+import time
 
 
 def is_valid_dir(dir: Path) -> bool:
@@ -271,13 +275,94 @@ def mod_resource_factory(path: Path = None, **kwargs) -> ModResource:
             return mod_dir
 
 
-class ParentModDir(ModDataDir):
+@dataclass
+class ModMetaData:
+    title: str
+    version: str
+    variant: str
+    modified_time: datetime
+    # TODO: Can likely get the mod 'post time' from nexus at least
+    # appearst that a string of numeric digits at the end of the
+    # folder name is the 'epoch seconds' timestamp of the mod post date!
+
+    def __init__(self, mod: ModResource):
+        title, version, variant = self.get_title_version_variant(mod.name)
+        modified_time = self.get_modified_time(mod.path)
+
+        self.title = title
+        self.version = version
+        self.variant = variant
+        self.modified_time = modified_time
+
+    @staticmethod
+    def get_title_version_variant(mod_name: str) -> Tuple[str, str, str | None]:
+        parts = mod_name.replace("-", " ").replace("_", " ").split()
+
+        def num_list_chars_in_str(s: str, list_chars: List[str]) -> int:
+            return sum([c in list_chars for c in s])
+
+        def is_versiony(s: str) -> bool:
+            """Returns True if the segment seems like part
+            of the version number.
+
+            Has to have more numbers than letters. OR, if there
+            is only one letter, that letter is a V"""
+
+            num_letters = num_list_chars_in_str(s, ascii_letters)
+            num_digits = num_list_chars_in_str(s, digits)
+
+            return (num_digits > num_letters) or (
+                (num_letters == 1) and "v" in s.casefold()
+            )
+
+        def format_name(parts: List[str]) -> str:
+            return " ".join(map(str.title, parts)).strip()
+
+        def format_version(parts: List[str]) -> str:
+            return ".".join(map(str.lower, parts)).strip(".").strip()
+
+        def format_variant(parts: List[str]) -> str:
+            return " ".join(map(str.upper, parts)).strip()
+
+        is_part_versiony = list(map(is_versiony, parts))
+
+        # assume everything before the first versiony part
+        # is the name
+        version_start_idx = is_part_versiony.index(True)
+        mod_title = format_name(parts[:version_start_idx])
+
+        # however, mod 'variants' are sometimes listed at the end of
+        # the folder name
+        # if the right-most segment is not versiony it indicates
+        # a variant
+        has_variant = not is_part_versiony[-1]
+
+        if not has_variant:
+            mod_version = format_version(parts[version_start_idx:])
+            mod_variant = None
+
+        else:
+            # find the first versiony bit from the right hand side
+            variant_start_idx = len(parts) - is_part_versiony[::-1].index(True)
+
+            mod_version = format_version(parts[version_start_idx:variant_start_idx])
+            mod_variant = format_name(parts[variant_start_idx:])
+
+        return (mod_title, mod_version, mod_variant)
+
+    @staticmethod
+    def get_modified_time(path: Path) -> datetime:
+        return datetime.fromtimestamp(path.stat().st_mtime)
+
+
+class Mod(ModDataDir):
     """A directory found in the MODS_DIR set in the config file"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.data_dirs = self.get_data_dirs()
+        self.metadata = ModMetaData(self)
 
     def __repr__(self):
         return f"ParentModDir[{self}]"
@@ -292,7 +377,7 @@ class ParentModDir(ModDataDir):
             )
 
 
-class Mod(ModDir):
+class ModsFolder(ModDir):
     """Top-level directory where mods directories are saved/unzipped into."""
 
     def __init__(self, path: Path):
@@ -304,9 +389,9 @@ class Mod(ModDir):
     def __repr__(self):
         return f"ModCollectionDir[{self}]"
 
-    def get_mods(self) -> List[ParentModDir]:
+    def get_mods(self) -> List[Mod]:
         return [
-            ParentModDir(dir, parent=self.name, child_factory=mod_resource_factory)
+            Mod(dir, parent=self.name, child_factory=mod_resource_factory)
             for dir in self.path.iterdir()
             if dir.is_dir()
         ]
@@ -316,7 +401,7 @@ if __name__ == "__main__":
     from settings import MODS_PATH
 
     print(f"scanning path {MODS_PATH} for Morrowind Mod Resources")
-    mod_dir = Mod(MODS_PATH)
+    mod_dir = ModsFolder(MODS_PATH)
 
     print(
         f"finished scanning directory - printing parent mod dirs and their child data folders"

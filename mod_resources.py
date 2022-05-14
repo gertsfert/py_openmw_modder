@@ -95,9 +95,9 @@ class ModDir(ModResource):
 
         if len(valid_children) == 0:
             # no more children, so no possible serach results, terminate result
-            return None
+            return [None]
 
-        return [child for child in valid_children if condition(valid_children)]
+        return [child for child in valid_children if condition(child)]
 
     def recurse_search_children(
         self, condition: Callable, only_of_instance=None
@@ -144,14 +144,26 @@ class ModDir(ModResource):
         return [result for results in recurse_results for result in results]
 
 
-class ModResourceDir(ModDir):
-    def __init__(self, mod_dir: ModDir):
+class ModSpecialDir(ModDir):
+    def __init__(self, *args, **kwargs):
+        if isinstance(args[0], ModDir):
+            self.from_mod_dir(args[0])
+
+        elif isinstance(args[0], Path):
+            self.from_path(*args, **kwargs)
+
+    def from_mod_dir(self, mod_dir: ModDir):
         self.path = mod_dir.path
         self.name = mod_dir.name
         self.parent = mod_dir.parent
         self.child_factory = mod_dir.child_factory
         self.children = mod_dir.children
 
+    def from_path(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class ModResourceDir(ModSpecialDir):
     def __repr__(self):
         return f"ModResourceDir[{self.parent}: {self}]"
 
@@ -160,7 +172,7 @@ class ModResourceDir(ModDir):
         return mod_dir.name.lower() in RESOURCE_DIR_NAMES
 
 
-class ModDataDir(ModDir):
+class ModDataDir(ModSpecialDir):
     """A 'Data Directory' - will have core mod files (ESP/BSA)
     or 'resource folders' at top-level.
 
@@ -172,16 +184,11 @@ class ModDataDir(ModDir):
         you also X mod)
     """
 
-    def __init__(self, mod_dir: ModDir):
-        self.path = mod_dir.path
-        self.name = mod_dir.name
-        self.parent = mod_dir.parent
-        self.child_factory = mod_dir.child_factory
-        self.children = mod_dir.children
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.to_activate = False
 
-        # internal vars - used to cache property results
         self._esp_files = None
         self._bsa_files = None
         self._resource_dirs = None
@@ -223,11 +230,12 @@ class ModDataDir(ModDir):
     def resource_dirs(self) -> List:
         if self._resource_dirs is None:
             self._resource_dirs = self.search_children(
-                condition=lambda x: x.name in RESOURCE_DIR_NAMES,
+                condition=ModResourceDir.is_mod_resource_dir,
                 only_of_instance=ModDir,
             )
         return self._resource_dirs
 
+    @property
     def has_resource_dirs(self) -> bool:
         return len(self.resource_dirs) > 0
 
@@ -263,7 +271,7 @@ def mod_resource_factory(path: Path = None, **kwargs) -> ModResource:
             return mod_dir
 
 
-class ParentModDir(ModDir):
+class ParentModDir(ModDataDir):
     """A directory found in the MODS_DIR set in the config file"""
 
     def __init__(self, *args, **kwargs):
@@ -291,14 +299,14 @@ class ModCollectionDir(ModDir):
         self.path = path
         self.name = path.stem
 
-        self.children = self.get_parent_mod_dirs()
+        self.mods = self.get_mods()
 
     def __repr__(self):
         return f"ModCollectionDir[{self}]"
 
-    def get_parent_mod_dirs(self) -> List[ParentModDir]:
+    def get_mods(self) -> List[ParentModDir]:
         return [
-            ParentModDir(path=dir, parent=self.name, child_factory=mod_resource_factory)
+            ParentModDir(dir, parent=self.name, child_factory=mod_resource_factory)
             for dir in self.path.iterdir()
             if dir.is_dir()
         ]

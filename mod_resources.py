@@ -94,8 +94,8 @@ class ModDir(ModResource):
             valid_children = self.children
 
         if len(valid_children) == 0:
-            # no more children, so no possible serach results, terminate result
-            return [None]
+            # no more children, so no possible serach results, return empty list
+            return list()
 
         return [child for child in valid_children if condition(child)]
 

@@ -33,7 +33,8 @@ class CLI(UI):
 
     def display_mod_contents(self, mod: ParentModDir) -> None:
         for data_dir in mod.data_dirs:
-            self.display_item(data_dir)
+            if data_dir is not mod:
+                self.display_title(data_dir)
             self.display_data_dir_contents(data_dir)
 
     def ask_to_activate(self) -> bool:

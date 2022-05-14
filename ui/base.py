@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from mod_resources import ModDataDir, ParentModDir
+from mod_resources import ModDataDir, Mod
 
 
 class UI(ABC):
@@ -8,9 +8,9 @@ class UI(ABC):
         ...
 
     @abstractmethod
-    def display_mod_contents(self, mod: ParentModDir) -> None:
+    def display_mod_contents(self, mod: Mod) -> None:
         ...
 
     @abstractmethod
-    def ask_to_activate(self, mod: ParentModDir) -> bool:
+    def ask_to_activate(self, mod: Mod) -> bool:
         ...

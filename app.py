@@ -1,5 +1,5 @@
 from mod_resources import Mod
-from ui.cli_ui import CLI
+from ui.cli import CLI
 
 import settings
 

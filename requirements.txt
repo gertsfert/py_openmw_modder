@@ -1,5 +1,2 @@
 black
 click
-
-# testing UI packages
-pyedifice

@@ -7,7 +7,6 @@ import random
 # TODO: CONFIG FILE YO
 MODS_PATH = Path("G:\Games\OpenMWMods")
 
-
 PADDING_SCALE = 2
 RESOURCE_FOLDER_NAMES = [
     "BookArt",
@@ -240,4 +239,4 @@ def print_folders_to_activate(parent_mod_dirs: List[ModDir]):
 if __name__ == "__main__":
     parent_mod_dirs = [ParentModDir(d) for d in MODS_PATH.iterdir() if d.is_dir()]
 
-    print_folders_to_activate(parent_mod_dirs)
+    get_folders_to_activate(parent_mod_dirs)

@@ -1,0 +1,26 @@
+core:
+  mods_path:
+    - G:\Games\OpenMWMods
+  open_mw_conf_path: G:\My Documents\My Games\OpenMW\openmw.cfg
+  
+parsing:
+  # names of folders which contain resources
+  # directories that contain these folders 
+  # will be considered data directories
+  resource_dir_names:
+    - bookart
+    - fonts
+    - icons
+    - meshes
+    - music
+    - sound
+    - splash
+    - textures
+    - video
+    - font
+  
+  # dates outside of this range will be considered 
+  # invalid for the purposes of parsing 'posted-time' 
+  # from the mod folder name
+  max_date_folder_timestamp: 2100-01-01
+  min_date_folder_timestamp: 2002-06-06

@@ -1,3 +1,4 @@
+from textwrap import indent
 from mod_resources import ModDataDir, Mod, ModsFolder
 from .base import UI
 
@@ -39,12 +40,14 @@ class CLI(UI):
 
     def display_mod_metadata(self, mod: Mod):
         meta = mod.metadata
-        self.display_title(meta.title)
+        self.display_item(f"title: {meta.title}", indent_level=1)
         if meta.variant:
             self.display_item(f"variant: {meta.variant}", indent_level=1)
 
+        self.display_item(f"id: {meta.id}", indent_level=1)
         self.display_item(f"version: {meta.version}", indent_level=1)
         self.display_item(f"modified: {meta.modified_time}", indent_level=1)
+        self.display_item(f"posted: {meta.posted_time}", indent_level=1)
 
     def ask_to_activate(self) -> bool:
         """Presents the directory mod contents, and asks the user if the

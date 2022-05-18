@@ -3,7 +3,9 @@ from typing import List
 import edifice as ed
 from mod_resources import Mod, ModDir, ModsFolder
 
-from settings import MODS_PATH
+from app_settings import AppSettings
+
+settings = AppSettings()
 
 
 class ModWidget(ed.Component):
@@ -34,7 +36,7 @@ class MWModHelper(ed.Component):
         ]
 
     def get_parent_mod_dirs(self) -> List[Mod]:
-        return [Mod(d) for d in MODS_PATH.iterdir() if d.is_dir()]
+        return [Mod(d) for d in settings.core.mods_path.iterdir() if d.is_dir()]
 
     def render(self):
         return ed.View(layout="column")(*self.parent_mod_widgets)

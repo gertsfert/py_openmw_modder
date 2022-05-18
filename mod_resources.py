@@ -1,11 +1,14 @@
 from pathlib import Path
-from typing import List, Callable, Dict, Tuple
+from typing import List, Callable, Dict, Tuple, Optional
 
-from settings import MODS_PATH, RESOURCE_DIR_NAMES
-from string import ascii_letters, digits
+from string import ascii_letters, digits, ascii_uppercase, ascii_lowercase
 from dataclasses import dataclass
-from datetime import datetime
-import time
+from datetime import datetime, date
+from app_settings import AppSettings
+
+import itertools
+
+settings = AppSettings()
 
 
 def is_valid_dir(dir: Path) -> bool:
@@ -173,7 +176,7 @@ class ModResourceDir(ModSpecialDir):
 
     @staticmethod
     def is_mod_resource_dir(mod_dir: ModDir) -> bool:
-        return mod_dir.name.lower() in RESOURCE_DIR_NAMES
+        return mod_dir.name.lower() in settings.parsing.resource_dir_names
 
 
 class ModDataDir(ModSpecialDir):
@@ -275,28 +278,70 @@ def mod_resource_factory(path: Path = None, **kwargs) -> ModResource:
             return mod_dir
 
 
+def add_space_between_pascal_case(s: str) -> str:
+    # TODO : this leaves off the last word :(
+    word_breaks = [
+        idx + 1
+        for idx, (c1, c2) in enumerate(itertools.pairwise(s))
+        if c1 in ascii_lowercase and c2 in ascii_uppercase
+    ]
+
+    if not word_breaks:
+        return s
+
+    s_words = [
+        s[idx_left:idx_right]
+        for idx_left, idx_right in itertools.pairwise(
+            [0] + word_breaks + [len(word_breaks) - 1]
+        )
+    ]
+
+    return " ".join(s_words)
+
+
 @dataclass
 class ModMetaData:
     title: str
+    id: int
     version: str
     variant: str
     modified_time: datetime
+    posted_time: datetime
     # TODO: Can likely get the mod 'post time' from nexus at least
     # appearst that a string of numeric digits at the end of the
     # folder name is the 'epoch seconds' timestamp of the mod post date!
 
     def __init__(self, mod: ModResource):
-        title, version, variant = self.get_title_version_variant(mod.name)
-        modified_time = self.get_modified_time(mod.path)
+        self.parse_folder_name(mod.name)
+        self.modified_time = self.get_modified_time(mod.path)
 
-        self.title = title
-        self.version = version
-        self.variant = variant
-        self.modified_time = modified_time
+    def parse_folder_name(self, mod_name: str):
+        """Parse the folder name for metadata
 
-    @staticmethod
-    def get_title_version_variant(mod_name: str) -> Tuple[str, str, str | None]:
+        Sets the following attributes:
+            self.title
+            self.version
+            self.variant
+            self.posted_time
+            self.id
+        """
         parts = mod_name.replace("-", " ").replace("_", " ").split()
+
+        def get_timestamp_if_present(s: str) -> None | date:
+            """Checks if a string is likely the posted time - normally the nexus
+            mod folders will have this in the last part.
+
+            If its a posted time, return the timestamp, otherwise returns None"""
+            if not (s.isnumeric()):
+                return None
+
+            parsed_ts = datetime.fromtimestamp(int(s))
+
+            min_date = settings.parsing.min_date_folder_timestamp
+            max_date = settings.parsing.max_date_folder_timestamp
+
+            if min_date <= parsed_ts.date() <= max_date:
+                return parsed_ts
 
         def num_list_chars_in_str(s: str, list_chars: List[str]) -> int:
             return sum([c in list_chars for c in s])
@@ -316,7 +361,7 @@ class ModMetaData:
             )
 
         def format_name(parts: List[str]) -> str:
-            return " ".join(map(str.title, parts)).strip()
+            return add_space_between_pascal_case(" ".join(map(str, parts)).strip())
 
         def format_version(parts: List[str]) -> str:
             return ".".join(map(str.lower, parts)).strip(".").strip()
@@ -324,12 +369,17 @@ class ModMetaData:
         def format_variant(parts: List[str]) -> str:
             return " ".join(map(str.upper, parts)).strip()
 
+        # get timestamp if present, and if it is - remove that part from the parsing
+        self.posted_time = get_timestamp_if_present(parts[-1])
+        if self.posted_time:
+            parts = parts[:-1]
+
         is_part_versiony = list(map(is_versiony, parts))
 
         # assume everything before the first versiony part
         # is the name
         version_start_idx = is_part_versiony.index(True)
-        mod_title = format_name(parts[:version_start_idx])
+        self.title = format_name(parts[:version_start_idx])
 
         # however, mod 'variants' are sometimes listed at the end of
         # the folder name
@@ -337,18 +387,27 @@ class ModMetaData:
         # a variant
         has_variant = not is_part_versiony[-1]
 
+        # check if first part of version is > 1000 - if so that is the mod_id
+        if parts[version_start_idx].isnumeric():
+            possible_mod_id = int(parts[version_start_idx])
+            if possible_mod_id > 1000:
+                self.id = possible_mod_id
+                version_start_idx += 1
+            else:
+                self.id = None
+        else:
+            self.id = None
+
         if not has_variant:
-            mod_version = format_version(parts[version_start_idx:])
-            mod_variant = None
+            self.version = format_version(parts[version_start_idx:])
+            self.variant = None
 
         else:
             # find the first versiony bit from the right hand side
             variant_start_idx = len(parts) - is_part_versiony[::-1].index(True)
 
-            mod_version = format_version(parts[version_start_idx:variant_start_idx])
-            mod_variant = format_name(parts[variant_start_idx:])
-
-        return (mod_title, mod_version, mod_variant)
+            self.version = format_version(parts[version_start_idx:variant_start_idx])
+            self.variant = format_variant(parts[variant_start_idx:])
 
     @staticmethod
     def get_modified_time(path: Path) -> datetime:
@@ -398,10 +457,8 @@ class ModsFolder(ModDir):
 
 
 if __name__ == "__main__":
-    from settings import MODS_PATH
-
-    print(f"scanning path {MODS_PATH} for Morrowind Mod Resources")
-    mod_dir = ModsFolder(MODS_PATH)
+    print(f"scanning path {settings.core.mods_path[0]} for Morrowind Mod Resources")
+    mod_dir = ModsFolder(settings.core.mods_path[0])
 
     print(
         f"finished scanning directory - printing parent mod dirs and their child data folders"

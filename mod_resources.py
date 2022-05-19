@@ -291,9 +291,7 @@ def add_space_between_pascal_case(s: str) -> str:
 
     s_words = [
         s[idx_left:idx_right]
-        for idx_left, idx_right in itertools.pairwise(
-            [0] + word_breaks + [len(word_breaks) - 1]
-        )
+        for idx_left, idx_right in itertools.pairwise([0] + word_breaks + [len(s)])
     ]
 
     return " ".join(s_words)

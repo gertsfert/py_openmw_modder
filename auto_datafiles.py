@@ -4,7 +4,9 @@ from typing import Tuple
 from enum import Enum
 import click
 
-from settings import OPEN_MW_CONF
+from app_settings import AppSettings
+
+settings = AppSettings()
 
 
 class ColourComponentType(Enum):
@@ -170,7 +172,9 @@ def read_cfg(cfg_path: Path) -> dict:
 def cli():
     """Automatic datafiles?!"""
     print("oh hi there")
-    read_cfg(OPEN_MW_CONF)
+
+
+read_cfg(settings.core.open_mw_conf_path)
 
 
 if __name__ == "__main__":

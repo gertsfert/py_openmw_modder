@@ -1,4 +1,4 @@
-from py_openmw_modder.mod_resources import ModDataDir, Mod, ModsFolder
+from app.mod_resources import ModDataDir, Mod, ModsFolder
 from .base import UI
 
 PADDING_SCALE = 2

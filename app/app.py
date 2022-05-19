@@ -1,7 +1,7 @@
-from py_openmw_modder.mod_resources import ModsFolder
-from py_openmw_modder.ui.cli import CLI
+from app.mod_resources import ModsFolder
+from app.ui.cli import CLI
 
-from py_openmw_modder.app_settings import AppSettings
+from app.app_settings import AppSettings
 
 settings = AppSettings()
 

@@ -4,7 +4,7 @@ import yaml
 from pathlib import Path
 from datetime import date
 
-SETTINGS_PATH = Path("app_settings.yaml")
+SETTINGS_PATH = Path(__file__).parent / "app_settings.yaml"
 
 
 def print_recurse_dict(d: dict | str, indent_value: int = 0):

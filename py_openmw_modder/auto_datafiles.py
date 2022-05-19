@@ -4,7 +4,7 @@ from typing import Tuple
 from enum import Enum
 import click
 
-from app_settings import AppSettings
+from py_openmw_modder.app_settings import AppSettings
 
 settings = AppSettings()
 

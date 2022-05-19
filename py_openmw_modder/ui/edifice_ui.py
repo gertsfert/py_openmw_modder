@@ -1,9 +1,8 @@
 from typing import List
 
 import edifice as ed
-from mod_resources import Mod, ModDir, ModsFolder
-
-from app_settings import AppSettings
+from py_openmw_modder.mod_resources import Mod, ModDir, ModsFolder
+from py_openmw_modder.app_settings import AppSettings
 
 settings = AppSettings()
 

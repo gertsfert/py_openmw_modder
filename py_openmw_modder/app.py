@@ -1,7 +1,7 @@
-from mod_resources import ModsFolder
-from ui.cli import CLI
+from py_openmw_modder.mod_resources import ModsFolder
+from py_openmw_modder.ui.cli import CLI
 
-from app_settings import AppSettings
+from py_openmw_modder.app_settings import AppSettings
 
 settings = AppSettings()
 
@@ -12,6 +12,7 @@ if __name__ == "__main__":
     ui = CLI()
 
     for mod in mod_collection.mods:
+        mod.get_data_dirs()
         ui.display_title(mod)
         ui.display_mod_metadata(mod)
         # ui.display_mod_contents(mod)

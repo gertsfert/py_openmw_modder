@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from mod_resources import ModDataDir, Mod
+from py_openmw_modder.mod_resources import ModDataDir, Mod
 
 
 class UI(ABC):

@@ -1,5 +1,4 @@
-from textwrap import indent
-from mod_resources import ModDataDir, Mod, ModsFolder
+from py_openmw_modder.mod_resources import ModDataDir, Mod, ModsFolder
 from .base import UI
 
 PADDING_SCALE = 2

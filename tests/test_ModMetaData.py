@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import pytest
 from datetime import datetime
 
-from py_openmw_modder.mod_resources import ModMetaData, ModsFolder
+from app.mod_resources import ModMetaData, ModsFolder
 
 
 @dataclass

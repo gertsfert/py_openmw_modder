@@ -4,7 +4,7 @@ from typing import List, Callable, Dict, Tuple, Optional
 from string import ascii_letters, digits, ascii_uppercase, ascii_lowercase
 from dataclasses import dataclass
 from datetime import datetime, date
-from py_openmw_modder.app_settings import AppSettings
+from app.app_settings import AppSettings
 
 import itertools
 

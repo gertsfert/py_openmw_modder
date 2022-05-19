@@ -4,7 +4,7 @@ from typing import List, Callable, Dict, Tuple, Optional
 from string import ascii_letters, digits, ascii_uppercase, ascii_lowercase
 from dataclasses import dataclass
 from datetime import datetime, date
-from app_settings import AppSettings
+from py_openmw_modder.app_settings import AppSettings
 
 import itertools
 
@@ -418,7 +418,7 @@ class Mod(ModDataDir):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.data_dirs = self.get_data_dirs()
+        self.data_dirs = None
         self.metadata = ModMetaData(self)
 
     def __repr__(self):
@@ -426,10 +426,10 @@ class Mod(ModDataDir):
 
     def get_data_dirs(self) -> List[ModDataDir]:
         if ModDataDir.is_mod_data_dir(self):
-            return [self]
+            self.data_dirs = [self]
 
         else:
-            return self.recurse_search_children(
+            self.data_dirs = self.recurse_search_children(
                 condition=ModDataDir.is_mod_data_dir, only_of_instance=ModDir
             )
 
